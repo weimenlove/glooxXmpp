@@ -15,6 +15,8 @@
 #include "gloox/logsink.h"
 #include "gloox/messagehandler.h"
 #include "gloox/base64.h"
+#include "gloox/tag.h"
+#include "gloox/taghandler.h"
 
 using namespace gloox;
 using namespace std;
@@ -27,7 +29,7 @@ const std::string jidString = "test@192.168.1.105/client";
  */
 
 class MessageTest : public ConnectionListener, LogHandler,
-        MessageHandler, TLSHandler
+        MessageHandler, TLSHandler, TagHandler
 {
 public:
     MessageTest()
@@ -41,20 +43,15 @@ public:
 
     void start()
     {
-
         JID jid(jidString);
-        j = new Client( jid, "test" );
-        j->registerConnectionListener( this );
-        j->registerMessageHandler( this );
-        j->disco()->setVersion( "messageTest", GLOOX_VERSION, "Linux" );
-        j->disco()->setIdentity( "client", "bot" );
-        j->disco()->addFeature( XMLNS_CHAT_STATES );
+        client = new Client( jid, "test" );
+        client->registerConnectionListener( this );
+        client->registerMessageHandler( this );
+        client->registerTagHandler(this, "iq", "");
+        client->logInstance().registerLogHandler( LogLevelDebug, LogAreaAll, this );
+        client->connect();
 
-        j->logInstance().registerLogHandler( LogLevelDebug, LogAreaAll, this );
-
-        j->connect();
-
-        delete j;
+        delete client;
     }
 
     virtual void onConnect()
@@ -69,7 +66,7 @@ public:
     {
         printf( "message_test: disconnected: %d\n", e );
         if( e == ConnAuthenticationFailed )
-            printf( "auth failed. reason: %d\n", j->authError() );
+            printf( "auth failed. reason: %d\n", client->authError() );
     }
 
     virtual bool onTLSConnect( const CertInfo& info )
@@ -87,13 +84,13 @@ public:
 
     void xtlsSend()
     {
-        Tag *m = new Tag( "message" );
+        Tag *m = new Tag( "iq", "xmlns", "xmpp:iq:gloox" );
         m->addAttribute( "to", rcpt.full() );
-        m->addAttribute( "type", "chat" );
-        Tag *x = new Tag( m, "xtls", Base64::encode64( m_send ) );
-        x->addAttribute( "xmlns", "test:xtls" );
-        m_send = "";
-        j->send( m );
+        m->addAttribute( "from", jidString );
+        m->addAttribute( "id", "client" );
+        Tag *x = new Tag( "dreq", "xmlns", "status" );
+        m->addChild(x);
+        client->send( m );
     }
 
     virtual void handleEncryptedData( const TLSBase* /*base*/, const std::string& data )
@@ -107,7 +104,7 @@ public:
         printf( "decrypted packet contents: %s\n", data.c_str() );
         m_tls->encrypt( "bye" );
         xtlsSend();
-        j->disconnect();
+        client->disconnect();
     }
 
     virtual void handleHandshakeResult( const TLSBase* /*base*/, bool success, CertInfo& /*certinfo*/ )
@@ -121,7 +118,16 @@ public:
         else
         {
             printf( "xtls handshake failed!\n" );
-            j->disconnect();
+            client->disconnect();
+        }
+    }
+
+    virtual void handleTag(Tag *tag)
+    {
+        if(tag) {
+            printf("tag name: %s, xml: %s\n", tag->name().c_str(), tag->xml().c_str());
+            xtlsSend();
+            sleep(2);
         }
     }
 
@@ -144,7 +150,7 @@ public:
     }
 
 private:
-    Client *j;
+    Client *client;
     TLSBase* m_tls;
     std::string m_send;
     const JID rcpt;

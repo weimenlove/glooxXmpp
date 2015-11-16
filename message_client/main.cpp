@@ -3,6 +3,8 @@
 #include <locale.h>
 #include <string>
 #include <cstdio> // [s]print[f]
+#include <sys/time.h>
+#include <sys/types.h>
 
 #include "gloox/client.h"
 #include "gloox/connectionlistener.h"
@@ -10,9 +12,8 @@
 #include "gloox/gloox.h"
 #include "gloox/loghandler.h"
 #include "gloox/logsink.h"
-#include "gloox/messagehandler.h"
-#include "gloox/tag.h"
-#include "gloox/taghandler.h"
+#include "gloox/connectiontcpclient.h"
+#include "gloox/connectiondatahandler.h"
 
 using namespace gloox;
 using namespace std;
@@ -28,7 +29,8 @@ class MessageTest : public ConnectionListener, LogHandler, TagHandler
 {
 public:
     MessageTest()
-        : rcpt( "gloox@192.168.1.105/server" ) {}
+    // parser set m_tagHandler to this, which call handleTag();
+        : rcpt( "gloox@192.168.1.105/server" ), parser(this) {}
 
     virtual ~MessageTest()
     {
@@ -41,15 +43,45 @@ public:
         client->registerConnectionListener( this );
         client->registerTagHandler(this, "iq", "");
         client->logInstance().registerLogHandler( LogLevelDebug, LogAreaAll, this );
-        client->connect();
+        // set m_handler to client, which call handleReceivedData(), will be call in recv()
+        ConnectionTCPClient *conn = new ConnectionTCPClient(client, client->logInstance(), "192.168.1.105", -1);
+        client->setConnectionImpl(conn);
+        client->connect(false);
 
+        int sock = conn->socket();
+        fd_set readfds;
+        struct timeval timeout;
+
+        while(1) {
+            int ret;
+            FD_ZERO(&readfds);
+            FD_SET(sock, &readfds);
+            timeout.tv_sec = 2;
+            timeout.tv_usec = 0;
+
+            ret = ::select(sock+1, &readfds, NULL, NULL, &timeout);
+            if(ret < 0) {
+                continue;
+            } else if(ret == 0) {
+                Tag *m = new Tag( "iq", "xmlns", "xmpp:iq:gloox" );
+                m->addAttribute( "to", rcpt.full() );
+                m->addAttribute( "from", jidString );
+                m->addAttribute( "id", "client" );
+                Tag *x = new Tag( "dreq", "xmlns", "status" );
+                m->addChild(x);
+                client->send( m );
+            } else {
+                client->recv();
+            }
+        }
+
+        delete conn;
         delete client;
     }
 
     virtual void onConnect()
     {
         printf( "connected!\n" );
-        xtlsSend();
     }
 
     virtual void onDisconnect( ConnectionError e )
@@ -72,22 +104,16 @@ public:
         return true;
     }
 
-    void xtlsSend()
+    virtual void handleReceivedData( const ConnectionBase* /*connection*/, const std::string& data )
     {
-        Tag *m = new Tag( "iq", "xmlns", "xmpp:iq:gloox" );
-        m->addAttribute( "to", rcpt.full() );
-        m->addAttribute( "from", jidString );
-        m->addAttribute( "id", "client" );
-        Tag *x = new Tag( "dreq", "xmlns", "status" );
-        m->addChild(x);
-        client->send( m );
+        string indata = data;
+        parser.feed(indata);
     }
 
     virtual void handleTag(Tag *tag)
     {
         if(tag) {
             printf("tag name: %s, xml: %s\n", tag->name().c_str(), tag->xml().c_str());
-            xtlsSend();
             sleep(2);
         }
     }
@@ -100,6 +126,7 @@ public:
 private:
     Client *client;
     const JID rcpt;
+    Parser parser;
 };
 
 int main( int /*argc*/, char** /*argv*/ )

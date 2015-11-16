@@ -22,3 +22,8 @@ http://camaya.net/gloox
 [gloox代码分析4 - private xml storage](<http://www.cppblog.com/woomsg/archive/2008/11/06/66144.html>)
 
 [如何利用jabber协议与gtalk服务器通讯 - 建立会话](<http://www.cppblog.com/woomsg/archive/2008/10/29/65424.html>)
+
+## warning ##
+
+* warning: ‘MessageTest::parser’ will be initialized after [-Wreorder]
+要按照变量的声明顺序进行初始化

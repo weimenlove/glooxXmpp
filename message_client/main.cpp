@@ -6,15 +6,11 @@
 
 #include "gloox/client.h"
 #include "gloox/connectionlistener.h"
-#include "gloox/disco.h"
 #include "gloox/message.h"
 #include "gloox/gloox.h"
 #include "gloox/loghandler.h"
-#include "gloox/tlshandler.h"
-#include "gloox/tlsdefault.h"
 #include "gloox/logsink.h"
 #include "gloox/messagehandler.h"
-#include "gloox/base64.h"
 #include "gloox/tag.h"
 #include "gloox/taghandler.h"
 
@@ -28,17 +24,14 @@ const std::string jidString = "test@192.168.1.105/client";
  * nor is it standardized in any way. Use this code at your own risk.
  */
 
-class MessageTest : public ConnectionListener, LogHandler,
-        MessageHandler, TLSHandler, TagHandler
+class MessageTest : public ConnectionListener, LogHandler, TagHandler
 {
 public:
     MessageTest()
-        : m_tls( new TLSDefault( this, "", TLSDefault::AnonymousClient ) ),
-          rcpt( "gloox@192.168.1.105/server" ) {}
+        : rcpt( "gloox@192.168.1.105/server" ) {}
 
     virtual ~MessageTest()
     {
-        delete m_tls;
     }
 
     void start()
@@ -46,7 +39,6 @@ public:
         JID jid(jidString);
         client = new Client( jid, "test" );
         client->registerConnectionListener( this );
-        client->registerMessageHandler( this );
         client->registerTagHandler(this, "iq", "");
         client->logInstance().registerLogHandler( LogLevelDebug, LogAreaAll, this );
         client->connect();
@@ -57,9 +49,7 @@ public:
     virtual void onConnect()
     {
         printf( "connected!\n" );
-        m_tls->handshake();
         xtlsSend();
-        m_send = "";
     }
 
     virtual void onDisconnect( ConnectionError e )
@@ -93,35 +83,6 @@ public:
         client->send( m );
     }
 
-    virtual void handleEncryptedData( const TLSBase* /*base*/, const std::string& data )
-    {
-        printf( "caching %d bytes of encrypted data\n", (int)data.length() );
-        m_send += data;
-    }
-
-    virtual void handleDecryptedData( const TLSBase* /*base*/, const std::string& data )
-    {
-        printf( "decrypted packet contents: %s\n", data.c_str() );
-        m_tls->encrypt( "bye" );
-        xtlsSend();
-        client->disconnect();
-    }
-
-    virtual void handleHandshakeResult( const TLSBase* /*base*/, bool success, CertInfo& /*certinfo*/ )
-    {
-        if( success )
-        {
-            printf( "xtls handshake successful!\n" );
-            m_tls->encrypt( "ping" );
-            xtlsSend();
-        }
-        else
-        {
-            printf( "xtls handshake failed!\n" );
-            client->disconnect();
-        }
-    }
-
     virtual void handleTag(Tag *tag)
     {
         if(tag) {
@@ -131,19 +92,6 @@ public:
         }
     }
 
-    virtual void handleMessage( const Message& msg, MessageSession * /*session*/ )
-    {
-        Tag* m = msg.tag();
-        Tag *x = m->findChild( "xtls", "xmlns", "test:xtls" );
-        if( x )
-        {
-            printf( "decrypting: %d\n", (int)x->cdata().length() );
-            m_tls->decrypt( Base64::decode64( x->cdata() ) );
-            xtlsSend();
-        }
-        delete m;
-    }
-
     virtual void handleLog( LogLevel level, LogArea area, const std::string& message )
     {
         printf("log: level: %d, area: %d, %s\n", level, area, message.c_str() );
@@ -151,8 +99,6 @@ public:
 
 private:
     Client *client;
-    TLSBase* m_tls;
-    std::string m_send;
     const JID rcpt;
 };
 

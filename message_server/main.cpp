@@ -73,7 +73,7 @@ public:
 
     void xtlsSend()
     {
-        Tag *m = new Tag( "iq", "xmlns", "xmpp:iq:gloox" );
+        Tag *m = new Tag( "iq"/*, "xmlns", "xmpp:iq:gloox"*/ );
         m->addAttribute( "to", rcpt.full() );
         m->addAttribute( "from", jidString );
         m->addAttribute( "id", "server" );

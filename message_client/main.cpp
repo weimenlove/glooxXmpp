@@ -104,11 +104,12 @@ public:
         return true;
     }
 
-    virtual void handleReceivedData( const ConnectionBase* /*connection*/, const std::string& data )
-    {
-        string indata = data;
-        parser.feed(indata);
-    }
+    // be called in clientbase.cpp
+//    virtual void handleReceivedData( const ConnectionBase* /*connection*/, const std::string& data )
+//    {
+//        string indata = data;
+//        parser.feed(indata);
+//    }
 
     virtual void handleTag(Tag *tag)
     {

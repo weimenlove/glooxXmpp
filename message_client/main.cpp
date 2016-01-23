@@ -42,7 +42,7 @@ public:
         client = new Client( jid, "test" );
         client->registerConnectionListener( this );
         client->registerTagHandler(this, "iq", "");
-        client->logInstance().registerLogHandler( LogLevelDebug, LogAreaAll, this );
+        client->logInstance().registerLogHandler( LogLevelError, LogAreaAll, this );
         // set m_handler to client, which call handleReceivedData(), will be call in recv()
         ConnectionTCPClient *conn = new ConnectionTCPClient(client, client->logInstance(), "192.168.1.105", -1);
         client->setConnectionImpl(conn);

@@ -40,7 +40,7 @@ public:
         client = new Client( jid, "gloox" );
         client->registerConnectionListener( this );
         client->registerTagHandler(this, "iq", "");
-        client->logInstance().registerLogHandler( LogLevelDebug, LogAreaAll, this );
+        client->logInstance().registerLogHandler( LogLevelError, LogAreaAll, this );
         client->connect();
 
         delete client;
@@ -73,7 +73,7 @@ public:
 
     void xtlsSend()
     {
-        Tag *m = new Tag( "iq"/*, "xmlns", "xmpp:iq:gloox"*/ );
+        Tag *m = new Tag( "iq", "xmlns", "xmpp:iq:gloox" );
         m->addAttribute( "to", rcpt.full() );
         m->addAttribute( "from", jidString );
         m->addAttribute( "id", "server" );
